@@ -1,0 +1,224 @@
+{
+  "name": "Free GOV course search",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 10
+            }
+          ]
+        },
+        "misfirePolicy": "coalesce_owner"
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -208,
+        -64
+      ],
+      "id": "1f6ff2d5-b119-455d-9d43-bb797ba49c06",
+      "name": "Schedule Trigger",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "= {{ $json.title }}__{{ $json.link }}",
+        "options": {
+          "systemMessage": "=নিচের সরকারি notice বাংলায় সংক্ষেপে বুঝিয়ে বলো। \nশিরোনাম: {{ $json.title }}\nলিংক: {{ $json.link }}\n\nযদি ২০২৬ সাল নিয়ে না হই তাহলে কোণ বার্তা দিবে না\n\nতুমি সরকারি notice-এর সহকারী। দেওয়া শিরোনাম বাংলায় সংক্ষেপে বুঝিয়ে বলো: কোর্সের নাম, কারা আবেদন করতে পারবে, সময়, আবেদনের শেষ তারিখ, ফ্রি কিনা।\nযা শিরোনামে নেই তা \"বিস্তারিত notice-এ দেখুন\" লিখবে, নিজে থেকে বানাবে না।\nসবশেষে লিংকটা দেবে।"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        912,
+        -64
+      ],
+      "id": "9754fa6b-2543-4d0c-8d84-1d15fc484cd6",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "chatId": "6072982714",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1264,
+        -64
+      ],
+      "id": "a427fc15-8622-4d82-8065-605aa13b8e43",
+      "name": "Send a text message",
+      "webhookId": "60a8a9eb-099e-4ab2-878b-d46d56e989df",
+      "credentials": {
+        "telegramApi": {
+          "id": "TtrD2mKmvUceEak3",
+          "name": "Telegram account 290"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://moysports.gov.bd/pages/notices",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        16,
+        -64
+      ],
+      "id": "1e3a5b34-53a0-4cbf-9501-1b3eed32bb3f",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "operation": "extractHtmlContent",
+        "extractionValues": {
+          "values": [
+            {
+              "key": "titles",
+              "cssSelector": "a",
+              "returnArray": true
+            },
+            {
+              "key": "links",
+              "cssSelector": "a",
+              "returnValue": "attribute",
+              "attribute": "href",
+              "returnArray": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        -64
+      ],
+      "id": "8956277f-6ca5-4fe8-b694-157eb49bb997",
+      "name": "HTML",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = 'https://moysports.gov.bd/pages/notices';\nconst d = $input.first().json;\nconst titles = d.titles || [];\nconst links = d.links || [];\nconst keywords = ['বিনামূল্যে', 'ফ্রি', 'প্রশিক্ষণ', 'কোর্স', 'free', 'training', 'course'];\n\nconst out = [];\ntitles.forEach((t, i) => {\n  const title = (t || '').trim();\n  let link = links[i] || '';\n  if (link.startsWith('/')) link = base + link;   // relative link কে full link বানানো\n  const hit = keywords.some(k => title.toLowerCase().includes(k.toLowerCase()));\n  if (hit && link) out.push({ json: { title, link } });\n});\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        -64
+      ],
+      "id": "59b5af85-832c-49a3-a508-8b3114e84fee",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "compare": "allFieldsExcept",
+        "fieldsToExclude": "={{ $('HTML').item.json.links }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        688,
+        -64
+      ],
+      "id": "46804ea7-3567-4209-a294-033232822d5c",
+      "name": "Remove Duplicates"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Remove Duplicates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Duplicates": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "53076bc2-529a-4c55-9a02-c325464f6e00",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ab95a641c1b7099ef407af1cf01df77e8f73a8620f3dfa9286ddaad6ae2c066b"
+  },
+  "nodeGroups": [],
+  "id": "7blsoAM8CjzFwtVF",
+  "tags": []
+}
